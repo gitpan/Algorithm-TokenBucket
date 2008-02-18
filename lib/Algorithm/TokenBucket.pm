@@ -1,9 +1,8 @@
 package Algorithm::TokenBucket;
-# $Id: TokenBucket.pm,v 1.2 2004/10/27 15:04:59 kappa Exp $
 
 use 5.006;
 
-our $VERSION = 0.2;
+our $VERSION = 0.3;
 
 use warnings;
 use strict;
@@ -52,7 +51,7 @@ Algorithm::TokenBucket - Token bucket rate limiting algorithm
     }
     # we're likely to have processed 200 items (and hogged CPU, btw)
 
-    Storable::store [$bucket->state], 'bucket.stored';
+    Storable::store $bucket, 'bucket.stored';
     my $bucket1 = new Algorithm::TokenBucket
             @{Storable::retrieve('bucket.stored')};
 
@@ -91,7 +90,11 @@ restoring a saved bucket, beware. See L</state>.
 
 sub new {
     my $class   = shift;
-    my Algorithm::TokenBucket $self = fields::new($class);
+    fields::new($class)->_init(@_);
+}
+
+sub _init {
+    my Algorithm::TokenBucket $self = shift;
 
     @$self{qw/info_rate burst_size _tokens _last_check_time/} = @_;
     $self->{_last_check_time} ||= time;
@@ -163,6 +166,39 @@ sub count {
     ($self->{_tokens} -= $size) < 0 and $self->{_tokens} = 0;
 }
 
+=item until($)
+
+This sub returns the number of seconds until I<N> tokens can be removed from the bucket.
+
+=cut
+
+sub until {
+    my Algorithm::TokenBucket $self = shift;
+    my $size = shift;
+
+    $self->_token_flow;
+
+    if ( $self->{_tokens} >= $size ) {
+        # can conform() right now
+        return 0;
+    } else {
+        my $needed = $size - $self->{_tokens};
+        return ( $needed / $self->{info_rate} );
+    }
+}
+
+use constant PACK_FORMAT => "F4";
+
+sub STORABLE_freeze {
+	my ( $self, $cloning ) = @_;
+	return pack(PACK_FORMAT(),$self->state);
+}
+
+sub STORABLE_thaw {
+	my ( $self, $cloning, $state ) = @_;
+	return $self->_init(unpack(PACK_FORMAT(),$state));
+}
+
 1;
 __END__
 
@@ -194,6 +230,11 @@ Works unreliably for fractional rates unless Time::HiRes is present.
 
 Documentation lacks the actual algorithm description. See links or read
 the source (there are about 20 lines of sparse perl in several subs, trust me).
+
+=head1 ACKNOWLEDGMENTS
+
+Yuval Kogman contributed the L</until> method, proper L<Storable> support
+and other things.
 
 =head1 AUTHOR
 
