@@ -1,0 +1,31 @@
+This file contains message digests of all files listed in MANIFEST,
+signed via the Module::Signature module, version 0.55.
+
+To verify the content in this distribution, first make sure you have
+Module::Signature installed, then type:
+
+    % cpansign -v
+
+It will check each file's integrity, as well as the signature's
+validity.  If "==> Signature verified OK! <==" is not displayed,
+the distribution may already have been compromised, and you should
+not run its Makefile.PL or Build.PL.
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+SHA1 27ecbbfc3052a0adba97292825ebfdc72cd8a773 Build.PL
+SHA1 211209f3bfd8318dfd8b9557520ff37f07dd22e9 Changes
+SHA1 4d7f0321895d2e36cb06e0108eae80ecf4b5ee55 MANIFEST
+SHA1 3f08e364057c78d01421e9647ebce47b1529f62b META.yml
+SHA1 ec3bacd3c68df6567be0375994696e27756bf663 Makefile.PL
+SHA1 822961a51f295ba6ee8efc4f06dad96cacb4ed9a README
+SHA1 efe237880c47265a271e1d40347a1cfe3ad54423 lib/Algorithm/TokenBucket.pm
+SHA1 1dea5de3a315d2d73985118ef306b8f74fbba2cc test.pl
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.6 (GNU/Linux)
+
+iD4DBQFHuwNEH6MXP+VZuMoRAs+4AJoCEtP3wLMLT7a0GQ41BCvQ/tjI7ACXcAGG
+L0x3DUcZmNF/ahLaPZSqqw==
+=X9er
+-----END PGP SIGNATURE-----

@@ -2,7 +2,7 @@ package Algorithm::TokenBucket;
 
 use 5.006;
 
-our $VERSION = 0.3;
+our $VERSION = 0.32;
 
 use warnings;
 use strict;
@@ -62,12 +62,13 @@ against a stream of items. It is also very easy to combine several
 rate-limiters in an C<AND> or C<OR> fashion.
 
 Each bucket has a memory footprint of constant size because the
-algorithm is based on statistics. This was my main motivation to
+algorithm is based on C<information rate>. This was my main motivation to
 implement it. Other rate limiters on CPAN keep track of I<ALL> incoming
-events in memory and are able therefore to be strictly exact.
+items in memory. It allows them to be precisely accurate.
 
 FYI, C<conform>, C<count>, C<information rate>, C<burst size> terms are
-shamelessly borrowed from http://linux-ip.net/gl/tcng/node62.html.
+shamelessly borrowed from http://linux-ip.net/gl/tcng/node62.html
+page.
 
 =head1 INTERFACE
 
@@ -100,23 +101,33 @@ sub _init {
     $self->{_last_check_time} ||= time;
     $self->{_tokens} ||= 0;
 
-    $self->_token_flow;
-
     return $self;
 }
 
 =item state()
 
 This method returns the state of the bucket as a list. Use it for storing purposes.
+Buckets also natively support freezing and thawing with L<Storable> by
+providing STORABLE_* callbacks.
 
 =cut
 
 sub state {
     my Algorithm::TokenBucket $self = shift;
 
-    $self->_token_flow;
-
     return @$self{qw/info_rate burst_size _tokens _last_check_time/};
+}
+
+use constant PACK_FORMAT => "d4";   # "F4" is not 5.6 compatible
+
+sub STORABLE_freeze {
+    my ( $self, $cloning ) = @_;
+    return pack(PACK_FORMAT(),$self->state);
+}
+
+sub STORABLE_thaw {
+    my ( $self, $cloning, $state ) = @_;
+    return $self->_init(unpack(PACK_FORMAT(),$state));
 }
 
 sub _token_flow {
@@ -133,8 +144,8 @@ sub _token_flow {
 =item conform($)
 
 This sub checks if the bucket contains at least I<N> tokens. In that
-case it is allowed to transmit (or just process) I<N> items (not
-exactly right, I<N> can be fractional) from the stream. A bucket never
+case it is allowed to transmit (or process) I<N> items (not
+exactly right because I<N> can be fractional) from the stream. A bucket never
 conforms to an I<N> greater than C<burst size>.
 
 It returns a boolean value.
@@ -169,6 +180,13 @@ sub count {
 =item until($)
 
 This sub returns the number of seconds until I<N> tokens can be removed from the bucket.
+It's especially useful in multitasking environments like L<POE> where you
+cannot busy-wait. One can safely schedule the next conform($N) check in until($N)
+seconds instead of checking repeatedly.
+
+Note that until() does not take into account C<burst size>. That means
+a bucket will not conform to I<N> even after sleeping for until($N)
+seconds if I<N> is greater than C<burst size>.
 
 =cut
 
@@ -185,18 +203,6 @@ sub until {
         my $needed = $size - $self->{_tokens};
         return ( $needed / $self->{info_rate} );
     }
-}
-
-use constant PACK_FORMAT => "F4";
-
-sub STORABLE_freeze {
-	my ( $self, $cloning ) = @_;
-	return pack(PACK_FORMAT(),$self->state);
-}
-
-sub STORABLE_thaw {
-	my ( $self, $cloning, $state ) = @_;
-	return $self->_init(unpack(PACK_FORMAT(),$state));
 }
 
 1;
@@ -224,12 +230,31 @@ Go, go, go!
         $rl1->count(1); $rl2->count(1);
     }
 
+Now, let's fix the CPU-hogging example from L</SYNOPSIS> using
+L</until()> method.
+
+    my $bucket = new Algorithm::TokenBucket 100 / 3600, 5;
+    my $time = Time::HiRes::time;
+    while (Time::HiRes::time - $time < 7200) {  # two hours
+        # be bursty
+        Time::HiRes::sleep $bucket->until(5);
+        if ($bucket->conform(5)) {  # should always be true
+            process(5);
+            $bucket->count(5);
+        }
+    }
+    # we're likely to have processed 200 items (without hogging the CPU)
+
 =head1 BUGS
 
 Works unreliably for fractional rates unless Time::HiRes is present.
 
 Documentation lacks the actual algorithm description. See links or read
 the source (there are about 20 lines of sparse perl in several subs, trust me).
+
+until($N) does not return infinity if $N is greater than C<burst
+size>. Sleeping for infinity seconds is both useless and hard to
+debug.
 
 =head1 ACKNOWLEDGMENTS
 

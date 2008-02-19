@@ -1,10 +1,8 @@
 #! /usr/bin/perl -w
 use strict;
 
-# $from-Id: bucket.t,v 1.1 2004/10/27 14:38:00 kappa Exp $
-
 use Test::NoWarnings;
-use Test::More tests => 25;
+use Test::More tests => 27;
 
 use Time::HiRes qw/sleep time/;
 
@@ -14,19 +12,30 @@ my $bucket = new Algorithm::TokenBucket 25/1, 4;
 isa_ok($bucket, 'Algorithm::TokenBucket');
 is($bucket->{info_rate}, 25, 'info_rate init');
 is($bucket->{burst_size}, 4, 'burst_size init');
-ok(abs($bucket->{_last_check_time} - time) < 0.1, 'check_time init');
-ok($bucket->{_tokens} < 0.01, 'tokens init');
+cmp_ok(abs($bucket->{_last_check_time} - time), '<', 0.1, 'check_time init');
+cmp_ok($bucket->{_tokens}, '<', 0.01, 'tokens init');
 sleep 0.3;
 ok($bucket->conform(0), '0 conforms');
 ok($bucket->conform(4), '4 conforms');
 ok(!$bucket->conform(5), '5 does not conform');
 $bucket->count(1);
 ok(!$bucket->conform(4), '4 no more conforms');
-ok($bucket->conform(3), 'only 3 does');
+ok($bucket->conform(3), 'only 3 does'); # point A
 $bucket->count(1);
 $bucket->count(1);
 $bucket->count(1);
-ok(!$bucket->conform(1), 'even 1 conforms no more');
+ok(!$bucket->conform(1.1), '1.1 conforms no more'); # point B
+
+# if had (4 - $SMALLNUM) tokens in point A and it took us long to
+# reach point B due to CPU load then we could possibly end up
+# with >1 tokens in point B.
+# 
+# In this case the bucket will conform to 1 or even more.
+# I greatly reduce the probability of test failure by testing
+# conformity to 1 + 0.1 (which is a kind of huge $SMALLNUM).
+
+$bucket->count(1000);
+is($bucket->{_tokens}, 0, '-= 1000 drained bucket to 0');
 
 # pass 50 within 2 seconds
 my $traffic = 50;
@@ -37,15 +46,20 @@ while (time - $time < 2) {
         $traffic--;
     }
 }
-is($traffic, 0, '50 in 2 seconds');
+cmp_ok($traffic, '>=', 0, '50 or less in 2 seconds');
+
+$bucket = new Algorithm::TokenBucket 25/1, 4; # start afresh (point C)
+
 my @state = $bucket->state;
 is($state[0], 25, 'state[0]');
 is($state[1], 4, 'state[1]');
-ok(abs($state[3] - time) < 0.1, 'state[3]');
+cmp_ok($state[2], '<', 0.01, 'state[2]');
+cmp_ok(abs($state[3] - time), '<', 0.1, 'state[3]');
 
 my $bucket1 = new Algorithm::TokenBucket @state;
 isa_ok($bucket1, 'Algorithm::TokenBucket');
-ok(!$bucket1->conform(1), 'restored bucket is almost empty');
+ok(!$bucket1->conform(2), 'restored bucket is almost empty'); # point D
+# if it took us long (>1/25 sec) from point C up to point D, conform(1) could be true
 sleep 0.1;
 ok($bucket1->conform(2), 'restored bucket works');
 

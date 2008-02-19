@@ -6,3 +6,4 @@ Makefile.PL
 README
 lib/Algorithm/TokenBucket.pm
 test.pl
+SIGNATURE    Added here by Module::Build
