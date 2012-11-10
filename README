@@ -1,4 +1,4 @@
-Algorithm::TokenBucket version 0.21
+Algorithm::TokenBucket version 0.35
 ===============================
 
 Token bucket algorithm is a flexible way of imposing a rate limit
@@ -22,7 +22,7 @@ To install this module type the following:
 
 COPYRIGHT AND LICENCE
 
-Licensed under Artistic license.
+This software is copyright (C) 2004-2012 by Alex Kapranoff.
 
-Copyright (C) 2004-2008 Alex Kapranoff <kappa@rambler-co.ru>
-
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
